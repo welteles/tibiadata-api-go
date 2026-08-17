@@ -377,7 +377,6 @@ func tibiaCharactersCharacter(c *gin.Context) {
 // @Failure      404  {object}  Information
 // @Failure      503  {object}  Information
 // @Router       /v4/charactertrades/ending [get]
-// TODO: This API needs to be refactored somehow to use tibiaDataRequestHandler
 func tibiaCharacterTradesEnding(c *gin.Context) {
 	// getting params from URL
 	filters, err := parseCharacterTradeFilters(c)

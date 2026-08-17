@@ -244,127 +244,146 @@ func buildCharacterTradesURL(page int, filters characterTradeFilterQuery) string
 func parseCharacterTradeFilters(c *gin.Context) (characterTradeFilterQuery, error) {
 	var filters characterTradeFilterQuery
 
-	// world
-	world := strings.TrimSpace(c.Query("world"))
-	if world != "" {
-		world = TibiaDataStringWorldFormatToTitle(world)
-		exists, err := validation.WorldExists(world)
-		if err != nil {
-			return filters, err
-		}
-		if !exists {
-			return filters, validation.ErrorWorldDoesNotExist
-		}
-		filters.World = world
-		filters.Display.World = world
+	if err := applyCharacterTradeWorldFilter(c, &filters); err != nil {
+		return filters, err
 	}
-
-	// pvp_type
-	pvpType := strings.TrimSpace(c.Query("pvp_type"))
-	if pvpType != "" {
-		id, name, ok := characterTradePvpTypeID(pvpType)
-		if !ok {
-			return filters, fmt.Errorf("the provided pvp type is invalid")
-		}
+	if err := applyCharacterTradeMappedFilter(c.Query("pvp_type"), characterTradePvpTypeID, "the provided pvp type is invalid", func(id, name string) {
 		filters.WorldPvpType = id
 		filters.Display.PvpType = name
+	}); err != nil {
+		return filters, err
 	}
-
-	// battleye
-	battleye := strings.TrimSpace(c.Query("battleye"))
-	if battleye != "" {
-		id, name, ok := characterTradeBattlEyeID(battleye)
-		if !ok {
-			return filters, fmt.Errorf("the provided battleye filter is invalid")
-		}
+	if err := applyCharacterTradeMappedFilter(c.Query("battleye"), characterTradeBattlEyeID, "the provided battleye filter is invalid", func(id, name string) {
 		filters.WorldBattlEyeState = id
 		filters.Display.BattlEye = name
+	}); err != nil {
+		return filters, err
 	}
-
-	// vocation
-	vocation := strings.TrimSpace(c.Query("vocation"))
-	if vocation != "" {
-		id, name, ok := characterTradeProfessionID(vocation)
-		if !ok {
-			return filters, validation.ErrorVocationDoesNotExist
-		}
-		if id != "" {
-			filters.Profession = id
-			filters.Display.Vocation = name
-		}
+	if err := applyCharacterTradeVocationFilter(c, &filters); err != nil {
+		return filters, err
 	}
-
-	// min_level
-	minLevel := strings.TrimSpace(c.Query("min_level"))
-	if minLevel != "" {
-		level, err := strconv.Atoi(minLevel)
-		if err != nil || level < 0 {
-			return filters, validation.ErrorStringCanNotBeConvertedToInt
-		}
-		filters.LevelRangeFrom = strconv.Itoa(level)
-		filters.Display.MinLevel = level
+	if err := applyCharacterTradeIntFilter(c.Query("min_level"), func(value int) {
+		filters.LevelRangeFrom = strconv.Itoa(value)
+		filters.Display.MinLevel = value
+	}); err != nil {
+		return filters, err
 	}
-
-	// max_level
-	maxLevel := strings.TrimSpace(c.Query("max_level"))
-	if maxLevel != "" {
-		level, err := strconv.Atoi(maxLevel)
-		if err != nil || level < 0 {
-			return filters, validation.ErrorStringCanNotBeConvertedToInt
-		}
-		filters.LevelRangeTo = strconv.Itoa(level)
-		filters.Display.MaxLevel = level
+	if err := applyCharacterTradeIntFilter(c.Query("max_level"), func(value int) {
+		filters.LevelRangeTo = strconv.Itoa(value)
+		filters.Display.MaxLevel = value
+	}); err != nil {
+		return filters, err
 	}
-
-	// skill
-	skill := strings.TrimSpace(c.Query("skill"))
-	if skill != "" {
-		id, name, ok := characterTradeSkillID(skill)
-		if !ok {
-			return filters, fmt.Errorf("the provided skill filter is invalid")
-		}
+	if err := applyCharacterTradeMappedFilter(c.Query("skill"), characterTradeSkillID, "the provided skill filter is invalid", func(id, name string) {
 		filters.SkillID = id
 		filters.Display.Skill = name
+	}); err != nil {
+		return filters, err
 	}
-
-	// min_skill
-	minSkill := strings.TrimSpace(c.Query("min_skill"))
-	if minSkill != "" {
-		value, err := strconv.Atoi(minSkill)
-		if err != nil || value < 0 {
-			return filters, validation.ErrorStringCanNotBeConvertedToInt
-		}
+	if err := applyCharacterTradeIntFilter(c.Query("min_skill"), func(value int) {
 		filters.SkillRangeFrom = strconv.Itoa(value)
 		filters.Display.MinSkill = value
+	}); err != nil {
+		return filters, err
 	}
-
-	// max_skill
-	maxSkill := strings.TrimSpace(c.Query("max_skill"))
-	if maxSkill != "" {
-		value, err := strconv.Atoi(maxSkill)
-		if err != nil || value < 0 {
-			return filters, validation.ErrorStringCanNotBeConvertedToInt
-		}
+	if err := applyCharacterTradeIntFilter(c.Query("max_skill"), func(value int) {
 		filters.SkillRangeTo = strconv.Itoa(value)
 		filters.Display.MaxSkill = value
+	}); err != nil {
+		return filters, err
 	}
-
-	// search
-	search := strings.TrimSpace(c.Query("search"))
-	if search != "" {
-		filters.SearchString = search
-		filters.Display.Search = search
-
-		searchType := strings.TrimSpace(c.Query("search_type"))
-		id, name, ok := characterTradeSearchTypeID(searchType)
-		if !ok {
-			return filters, fmt.Errorf("the provided search type is invalid")
-		}
-		filters.SearchType = id
-		filters.Display.SearchType = name
+	if err := applyCharacterTradeSearchFilter(c, &filters); err != nil {
+		return filters, err
 	}
 
 	return filters, nil
+}
+
+func applyCharacterTradeWorldFilter(c *gin.Context, filters *characterTradeFilterQuery) error {
+	world := strings.TrimSpace(c.Query("world"))
+	if world == "" {
+		return nil
+	}
+
+	world = TibiaDataStringWorldFormatToTitle(world)
+	exists, err := validation.WorldExists(world)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return validation.ErrorWorldDoesNotExist
+	}
+
+	filters.World = world
+	filters.Display.World = world
+	return nil
+}
+
+func applyCharacterTradeVocationFilter(c *gin.Context, filters *characterTradeFilterQuery) error {
+	vocation := strings.TrimSpace(c.Query("vocation"))
+	if vocation == "" {
+		return nil
+	}
+
+	id, name, ok := characterTradeProfessionID(vocation)
+	if !ok {
+		return validation.ErrorVocationDoesNotExist
+	}
+	if id == "" {
+		return nil
+	}
+
+	filters.Profession = id
+	filters.Display.Vocation = name
+	return nil
+}
+
+func applyCharacterTradeSearchFilter(c *gin.Context, filters *characterTradeFilterQuery) error {
+	search := strings.TrimSpace(c.Query("search"))
+	if search == "" {
+		return nil
+	}
+
+	id, name, ok := characterTradeSearchTypeID(c.Query("search_type"))
+	if !ok {
+		return fmt.Errorf("the provided search type is invalid")
+	}
+
+	filters.SearchString = search
+	filters.Display.Search = search
+	filters.SearchType = id
+	filters.Display.SearchType = name
+	return nil
+}
+
+func applyCharacterTradeMappedFilter(raw string, mapper func(string) (string, string, bool), invalidMsg string, apply func(id, name string)) error {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil
+	}
+
+	id, name, ok := mapper(value)
+	if !ok {
+		return fmt.Errorf("%s", invalidMsg)
+	}
+
+	apply(id, name)
+	return nil
+}
+
+func applyCharacterTradeIntFilter(raw string, apply func(value int)) error {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return validation.ErrorStringCanNotBeConvertedToInt
+	}
+
+	apply(parsed)
+	return nil
 }
 
 func characterTradeProfessionID(vocation string) (string, string, bool) {
@@ -510,7 +529,7 @@ func parseCharacterTradeAuction(s *goquery.Selection, AuctionDivHTML string) (Ch
 	return OneAuction, auctionEndTime, true
 }
 
-func characterTradeEndsWithin(auctionEnd time.Time, now time.Time, deadline time.Time) bool {
+func characterTradeEndsWithin(auctionEnd, now, deadline time.Time) bool {
 	return !auctionEnd.Before(now) && !auctionEnd.After(deadline)
 }
 
